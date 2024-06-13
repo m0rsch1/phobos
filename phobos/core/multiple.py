@@ -7,6 +7,9 @@ from ..io.base import Representation
 from ..io.smurf_reflection import SmurfBase
 from ..io.xml_factory import plural as _plural, singular as _singular
 
+from ..commandline_logging import get_logger
+log = get_logger(__name__)
+
 __IMPORTS__ = [x for x in dir() if not x.startswith("__")]
 
 
@@ -37,7 +40,7 @@ class Entity(Representation, SmurfBase):
         for frame in _plural(frames):
             self._frames.append(frame)
         self.anchor = anchor
-        self.parent = parent.upper()
+        self.parent = parent
         self.child = child
         SmurfBase.__init__(self, name=name, returns=["name", "type", "parent", "position", "rotation", "anchor", "root", "file", "child"], **kwargs)
         self.excludes += ["origin", "model"]
@@ -105,7 +108,7 @@ class Entity(Representation, SmurfBase):
     def position(self, val):
         if self.origin is None:
             self.origin = representation.Pose()
-        self.origin.xyz = [val["x"], val["y"], val["z"]]
+        self.origin.position = val
 
     @property
     def rotation(self):
@@ -199,6 +202,7 @@ class Arrangement(Representation, SmurfBase):
     def add_entity(self, entity):
         assert isinstance(entity, Entity)
         assert self.get_aggregate("entities", str(entity)) is None, f"There is already an entity with the name {str(entity)}"
+        log.debug("Adding entity "+ entity.name)
         self.entities.append(entity)
 
     def get_aggregate(self, typeName, elem):
@@ -296,13 +300,13 @@ class Arrangement(Representation, SmurfBase):
                     continue
                 if entity._anchor == "PARENT":
                     assert "::" in entity.parent, "Please specify the parent in the way entity::link. Received: "+entity.parent
-                    parent_entity, parent_link = entity.parent.split("::", 1)
+                    parent_entity, parent_link_name = entity.parent.split("::", 1)
                 else:
                     assert "::" in entity._anchor, "Please specify the anchor in the way entity::link or use the parent keyword. Received: "+entity._anchor
-                    parent_entity, parent_link = entity._anchor.split("::", 1)
+                    parent_entity, parent_link_name = entity._anchor.split("::", 1)
                 if parent_entity in [str(e) for e in entities_in_tree]:
-                    parent_link = assembly.get_link(parent_entity+"_"+parent_link)
-                    assert parent_link is not None
+                    parent_link = assembly.get_link(parent_entity+"_"+parent_link_name, verbose=True)
+                    assert parent_link is not None, f"parent link {parent_entity}_{parent_link_name} not found "+str(entity)
                     if isinstance(root_entity.model, Robot):
                         attach_model = entity.model.duplicate()
                         assembly.unlink_from_world()
@@ -317,13 +321,13 @@ class Arrangement(Representation, SmurfBase):
                         # make sure that we have a consistent downward tree
                         attach_model.exchange_root(child_link)
                     attach_model.unlink_from_world()
-                    attach_model.rename_all(prefix=entity.name + "_")
+                    attach_model.rename_all(prefix=entity.name + "_", do_not_double=False)
                     origin = entity.origin.duplicate()
                     origin.relative_to = str(entity.origin.relative_to).replace("::", "_", 1)
                     assembly.attach(
                         other=attach_model,
                         joint=representation.Joint(
-                            name=str(parent_entity)+"2"+str(entity),
+                            name=str(parent_entity)+"_2_"+str(entity),
                             parent=parent_link,
                             child=child_link,
                             type="fixed",
@@ -334,6 +338,7 @@ class Arrangement(Representation, SmurfBase):
                     attached += 1
 
         assembly.link_entities()
+        assert assembly.verify_meshes()
         return assembly
 
     def export_sdf(self, use_includes=True):

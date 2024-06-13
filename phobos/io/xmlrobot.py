@@ -10,6 +10,7 @@ from .xml_factory import plural as _plural
 from ..commandline_logging import get_logger
 from ..utils.transform import create_transformation, get_adjoint, inv
 from ..utils.tree import get_joints_depth_first
+from ..utils import misc
 
 log = get_logger(__name__)
 
@@ -27,10 +28,10 @@ class XMLRobot(Representation):
                  physical_links: List[representation.Link] = None,
                  joints: List[representation.Joint] = None,
                  materials: List[representation.Material] = None,
+                 referenced_materials: List[representation.Material] = None,
                  transmissions: List[representation.Transmission] = None,
-                 sensors=None, sensors_that_dont_belong_to_links_or_joints=None, motors=None,
-                 plugins=None, root=None, is_human=False,
-                 urdf_version=None, xmlfile=None, _xmlfile=None):
+                 sensors=None, motors=None, plugins=None, root=None,
+                 is_human=False, urdf_version=None, xmlfile=None, _xmlfile=None):
         self._related_robot_instance = self
         super().__init__()
         self.joints = []
@@ -40,14 +41,17 @@ class XMLRobot(Representation):
         self.materials = []
         self.transmissions = [] # [TODO v2.1.0] currently not fully supported
         self.sensors = []
-        if sensors_that_dont_belong_to_links_or_joints is not None:
-            self.sensors_that_dont_belong_to_links_or_joints = sensors_that_dont_belong_to_links_or_joints
         self.plugins = []  # Currently just a place holder
         self.motors = []
         self.xmlfile = xmlfile if xmlfile is not None else _xmlfile
 
         # Default export mesh format from phobos.defs.MESH_TYPES
         self.mesh_format = "input_type"
+        # Default export setting
+        self.write_material_references = True
+        # Whether to use the primitive objects if the collision provides them on export
+        # If this is set true only the link nows about the collision instances anyone calling it's collision getter will receive their primitives
+        self.provide_primitives = False
 
         if name is None or len(name) == 0:
             if self.xmlfile is not None:
@@ -57,7 +61,7 @@ class XMLRobot(Representation):
         else:
             self.name = name
 
-        self.version = version
+        self.version = version if version else "0.0.0"
         self.urdf_version = "1.0" if urdf_version is None else urdf_version
 
         if joints is not None:
@@ -73,7 +77,7 @@ class XMLRobot(Representation):
             for link in physical_links:
                 self.add_aggregate("link", link)
 
-        self.materials = materials if materials is not None else []
+        self.materials = materials if materials is not None else referenced_materials if referenced_materials is not None else []
         self.transmissions = transmissions if transmissions is not None else []
         self.sensors = sensors if sensors is not None else []
         self.motors = motors if motors is not None else []
@@ -85,10 +89,18 @@ class XMLRobot(Representation):
 
         self.regenerate_tree_maps()
         if self.links:
+            # link everything
             self.link_entities()
             if root is not None:
                 assert root in [str(l) for l in self.links], "root specified in xml is no link in the robot"
                 assert root == str(self.get_root()), "root specified in xml is not root of the robot"
+
+    def get_used_mesh_formats(self):
+        formats = set()
+        for vc in self.collisions + self.visuals:
+            if isinstance(vc.geometry, representation.Mesh):
+                formats.add(vc.geometry.abs_filepath.rsplit(".",1)[-1])
+        return list(formats)
 
     def __str__(self):
         return self.name
@@ -103,8 +115,28 @@ class XMLRobot(Representation):
 
     def assert_validity(self):
         assert self.get_root().origin is None or self.get_root().origin.is_zero()
+        # assert there are no links relative_to it self
         for link in self.links:
             assert link.origin is None or link.origin.relative_to != link.name
+        # assert names are unique
+        for entity_list in ["collisions", "visuals", "joints", "links", "sensors"]:
+            entity_names = set()
+            for e in getattr(self, entity_list):
+                entity_names.add(e.name)
+            if len(entity_names) < len(getattr(self, entity_list)):
+                log.error(entity_list+" name: "+ ", ".join([str(e) for e in getattr(self, entity_list)]))
+                raise AssertionError(entity_list[:-1]+" names are not unique!")
+
+    @property
+    def referenced_materials(self):
+        if self.write_material_references:
+            return self.materials
+        else:
+            return None
+
+    @referenced_materials.setter
+    def referenced_materials(self, materials):
+        self.materials = materials if materials is not None else []
 
     @property
     def collisions(self):
@@ -115,24 +147,28 @@ class XMLRobot(Representation):
         return self.get_all_visuals()
 
     @property
-    def sensors_that_dont_belong_to_links_or_joints(self):
-        return [s for s in self.sensors if getattr(s, "link", None) is None and getattr(s, "joint", None) is None]
+    def movable_joints(self):
+        return [joint for joint in self.joints if joint.joint_type != "fixed"]
 
     @property
     def frames(self):
-        return [lnk for lnk in self.links if not(lnk.inertial or lnk.collision or lnk.visual)]
+        return [lnk for lnk in self.links if not(lnk.inertials or lnk.collisions or lnk.visuals)]
 
     @frames.setter
     def frames(self, frames):
-        self.add_aggregate("link". frames)
+        self.add_aggregate("link", frames)
 
     @property
     def physical_links(self):
-        return [lnk for lnk in self.links if (lnk.inertial or lnk.collision or lnk.visual)]
+        return [lnk for lnk in self.links if (lnk.inertial or lnk.collisions or lnk.visuals)]
 
     @physical_links.setter
     def physical_links(self, links):
         self.add_aggregate("link". links)
+
+    @property
+    def sensors_that_dont_belong_to_links_or_joints(self):
+        return [s for s in self.sensors if getattr(s, "link", None) is None and getattr(s, "joint", None) is None]
 
     @sensors_that_dont_belong_to_links_or_joints.setter
     def sensors_that_dont_belong_to_links_or_joints(self, value):
@@ -147,19 +183,30 @@ class XMLRobot(Representation):
 
     def link_entities(self, check_linkage_later=False):
         root = self.get_root()
-        self.assert_validity()
-
         for link in self.links:
             for child_entity in ([link.inertial] if link.inertial is not None else []) + link.visuals + link.collisions:
                 child_entity.link = link
                 if child_entity.origin is not None and child_entity.origin.relative_to is None:
                     child_entity.origin.relative_to = link
+        # make sure we have unique visual and collision names
+        for geo_list in ["collisions", "visuals"]:
+            geo_names = set()
+            for g in getattr(self, geo_list):
+                geo_names.add(g.name)
+            if len(geo_names) < len(getattr(self, geo_list)):
+                log.warning(geo_list[:-1]+" names are not unique, setting link name as prefix")
+                for g in getattr(self, geo_list):
+                    g.name = misc.edit_name_string(g.name, prefix=str(g.link)+"_", do_not_double=True)
+
         for joint in self.joints:
             if joint.origin.relative_to is None:
                 parent = self.get_parent(joint.name)
                 joint.origin.relative_to = parent if parent is not None else self.get_root().name
         for entity in self.links + self.joints + self.motors + self.sensors + self.materials:
             entity.link_with_robot(self, check_linkage_later=True)
+
+        self.assert_validity()
+
         if not check_linkage_later:
             assert self.check_linkage()
 
@@ -282,6 +329,8 @@ class XMLRobot(Representation):
                 self.child_map[j.parent].append((j.name, j.child))
             else:
                 self.child_map[j.parent] = [(j.name, j.child)]
+        if self.joints:
+            self.joints = self.get_joints_ordered_df()
 
     def add_aggregate(self, typeName, elem, silent=False):
         assert elem is not None
@@ -305,6 +354,13 @@ class XMLRobot(Representation):
                 self.joints += [elem]
         elif typeName in 'links':
             if elem not in self.links:
+                if elem in [str(l) for l in self.links]:
+                    counter = 1
+                    while str(elem) + f"_{counter}" in [str(l) for l in self.links]:
+                        counter += 1
+                    if not silent:
+                        log.debug(f"Renamed {typeName} {str(elem)} to {str(elem)}_{counter}")
+                    elem.set_unique_name(str(elem) + f"_{counter}")
                 self.links += [elem]
         else:
             if not typeName.endswith("s"):
@@ -479,6 +535,19 @@ class XMLRobot(Representation):
         assert root is not None, "No roots detected, invalid URDF."
         return root
 
+    def get_roots(self):
+        """Returns all links that have currently root characteristics.
+        If there is more than one root this robot is not properly defined
+
+        Returns:
+            list: the rooty links
+        """
+        roots = []
+        for link in self.links:
+            if link.name not in self.parent_map:
+                roots.append(link)
+        return roots
+
     def get_aggregate(self, targettype, target, verbose=False):
         """
         Returns the id of the given instance
@@ -627,6 +696,12 @@ class XMLRobot(Representation):
                     return coll
 
         return None
+
+    def get_all_primitives(self):
+        primitives = []
+        for link in self.links:
+            primitives += link.primitives
+        return primitives
 
     def get_id(self, targettype, target):
         """
@@ -843,12 +918,12 @@ class XMLRobot(Representation):
 
     def post_read_xml(self):
         """Version and validity check"""
-        if self.version is None:
-            self.version = "1.0"
+        if self.urdf_version is None:
+            self.urdf_version = "1.0"
 
-        split = self.version.split(".")
+        split = self.urdf_version.split(".")
         if len(split) != 2:
-            raise ValueError("The version attribute should be in the form 'x.y'")
+            raise ValueError("The urdf_version attribute should be in the form 'x.y'")
 
         if split[0] == '' or split[1] == '':
             raise ValueError("Empty major or minor number is not allowed")
@@ -856,8 +931,8 @@ class XMLRobot(Representation):
         if int(split[0]) < 0 or int(split[1]) < 0:
             raise ValueError("Version number must be positive")
 
-        if self.version not in self.SUPPORTED_VERSIONS:
-            raise ValueError("Invalid version; only %s is supported" % (','.join(self.SUPPORTED_VERSIONS)))
+        if self.urdf_version not in self.SUPPORTED_VERSIONS:
+            raise ValueError("Invalid urdf_version; only %s is supported" % (','.join(self.SUPPORTED_VERSIONS)))
 
 
 xml_factory.class_factory(XMLRobot)
