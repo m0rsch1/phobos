@@ -173,9 +173,9 @@ class Arrangement(Representation, SmurfBase):
         SmurfBase.__init__(self, returns=["entities"], **kwargs)
         self.name = name
         self.entities = _plural(entities)
-        self.inputfile = os.path.abspath(inputfile)
         self._frames = _plural(frames)
-        if self.inputfile is not None:
+        if self.inputfile is not None:  
+            self.inputfile = os.path.abspath(inputfile)
             ext = self.inputfile.lower().rsplit(".", 1)[-1]
             if ext == "sdf":
                 # [Todo v2.1.0]
