@@ -172,6 +172,7 @@ class Arrangement(Representation, SmurfBase):
         Representation.__init__(self)
         SmurfBase.__init__(self, returns=["entities"], **kwargs)
         self.name = name
+        self.inputfile = inputfile
         self.entities = _plural(entities)
         self._frames = _plural(frames)
         if self.inputfile is not None:  
