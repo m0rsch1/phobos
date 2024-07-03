@@ -276,7 +276,7 @@ def is_binary_file(filepath):
         return bool(f.read(256).translate(None, textchars))
 
 
-def execute_shell_command(cmd, cwd=None, dry_run=False, silent=False, verbose=False):
+def execute_shell_command(cmd, cwd=None, dry_run=False, silent=False, verbose=False, executable=None):
     if cwd is None:
         cwd = os.getcwd()
     if not silent:
@@ -288,7 +288,10 @@ def execute_shell_command(cmd, cwd=None, dry_run=False, silent=False, verbose=Fa
         log.info("Executing: "+cmd+" in "+cwd)
     elif not silent:
         log.debug("Executing: "+cmd+" in "+cwd)
-    proc = subprocess.Popen([cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd=cwd, executable="/bin/bash")
+    if executable:
+        proc = subprocess.Popen([cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd=cwd, executable=executable)
+    else:
+        proc = subprocess.Popen([cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True, cwd=cwd)
     # proc.wait()
     (out, err) = proc.communicate()
     if verbose:

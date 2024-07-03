@@ -866,7 +866,7 @@ class BaseModel(yaml.YAMLObject):
                     script["cwd"] = self.exportdir
                 else:
                     script["cwd"] = misc.abspath(script["cwd"])
-                misc.execute_shell_command(script["cmd"], script["cwd"], verbose=True)
+                misc.execute_shell_command(script["cmd"], script["cwd"], verbose=True, executable=script.get("executable", None))
             log.info('Finished post_processing of the new model')
 
         if ros_pkg_name is not None:
