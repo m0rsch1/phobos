@@ -387,19 +387,19 @@ class Material(Representation, SmurfBase):
         self.name = value
 
     def check_valid(self):
-        # [TODO v2.0.0] REVIEW add other colors here
+        # [TODO v2.2.0] REVIEW add other colors here
         if self.diffuse is None and self.diffuseTexture is None:
             raise Exception("Material has neither a color nor texture.")
 
     def equivalent(self, other):
-        # [TODO v2.0.0] REVIEW add other colors here
+        # [TODO v2.2.0] REVIEW add other colors here
         return self == other or (
                 (self.diffuseTexture == other.diffuseTexture or (self.diffuseTexture is not None and self.diffuseTexture.equivalent(self.diffuseTexture))) and
                 other.diffuse == self.diffuse
         )
 
     def is_delegate(self):
-        # [TODO v2.0.0] REVIEW add other colors here
+        # [TODO v2.2.0] REVIEW add other colors here
         return self.diffuse is None and self.diffuseTexture is None
 
     @property

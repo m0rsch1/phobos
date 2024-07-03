@@ -139,7 +139,6 @@ class BaseModel(yaml.YAMLObject):
         assert hasattr(self, "assemble") and len(self.assemble) > 0
 
         # list directly imported mesh pathes
-        # [TODO pre_v2.0.0] REVIEW mesh usage
         self._meshes = []
         for _, v in self.input_models.items():
             if "basefile" in v.keys():
@@ -566,7 +565,7 @@ class BaseModel(yaml.YAMLObject):
                 if self.robot.get_joint(jointname) is None and ("cut_joint" not in config or config["cut_joint"] is False):
                     faulty_joint_defs += [(jointname, [str(j) for j in self.robot.joints if jointname in str(j) or str(j) in jointname])]
                 elif self.robot.get_joint(jointname) is None and ("cut_joint" in config and config["cut_joint"] is True):  # cut_joint
-                    # [TODO v2.0.0] Review and Check whether this works as expected
+                    # [TODO v2.2.0] Review and Check whether this works as expected
                     # Check whether everything is given and calculate origin and axis (?)
                     _joint = representation.Joint(**config)
                     assert "constraint_axes" in config
