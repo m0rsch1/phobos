@@ -194,6 +194,8 @@ class Pose(Representation, SmurfBase):
             self._matrix[0:3, 3] = np.array([0.0, 0.0, 0.0])
         else:
             assert (type(value) in [list, np.ndarray, tuple] or (hasattr(value, "__len__") and type(value) != str)) and len(value) == 3
+            if isinstance(value, dict):
+                value = [value['x'], value['y'], value['z']]
             self._matrix[0:3, 3] = np.array(value)
 
     def from_vec(self, vec):
