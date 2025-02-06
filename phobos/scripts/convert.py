@@ -79,7 +79,8 @@ def main(args):
     elif args.output.lower().endswith("smurf") or path.isdir(args.output):
         log.info("Converting to SMURF")
         if robot:
-            robot.export(outputdir=args.output, export_config=resources.get_default_export_config(), mesh_format=args.mesh_type)
+            #robot.export(outputdir=args.output, export_config=resources.get_default_export_config(), mesh_format=args.mesh_type)
+            robot.export(outputdir=args.output, export_config=resources.get_default_export_config())
         else: # todo this is also valid for sdf and urdf
             if not path.isdir(args.output):
                 raise IOError(f"Please specify a directory as output, when exporting a world with multiple entities. {args.output} is not a directory.")
