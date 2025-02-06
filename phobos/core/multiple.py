@@ -351,6 +351,10 @@ class Arrangement(Representation, SmurfBase):
         assert outputfile.endswith("smurfa")
         self.inputfile = os.path.abspath(outputfile)
         out = self.to_yaml()
+        # Resolve entities
+        out['entities'] = []
+        for entity in self.entities:
+            out['entities'].append(entity.to_yaml())
         if not os.path.exists(os.path.dirname(os.path.abspath(outputfile))):
             os.makedirs(os.path.dirname(os.path.abspath(outputfile)), exist_ok=True)
         with open(outputfile, "w") as f:
