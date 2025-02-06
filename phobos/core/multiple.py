@@ -74,7 +74,7 @@ class Entity(Representation, SmurfBase):
     @property
     def file(self):
         return os.path.relpath(
-            getattr(self.model, "smurffile", getattr(self.model, "xmlfile", getattr(self.model, "inputfile"))),
+            getattr(self.model, "smurffile", getattr(self.model, "xmlfile", getattr(self.model, "inputfiles"))),
             os.path.dirname(self.model._related_world_instance.inputfile)
         )
 
