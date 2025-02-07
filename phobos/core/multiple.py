@@ -293,8 +293,10 @@ class Arrangement(Representation, SmurfBase):
             assembly = root_entity.model.assemble()
         else:
             raise TypeError(f"Wrong model type of entity {root_entity.name}: {type(root_entity.model)}")
+        assembly.name = self.name
         assembly.unlink_from_world()
-        assembly.rename_all(prefix=root_entity.name + "_" if self.name is None else self.name + "_" + root_entity.name + "_")
+        #assembly.rename_all(prefix=root_entity.name + "_" if self.name is None else self.name + "_" + root_entity.name + "_")
+        assembly.rename_all(prefix=root_entity.name + "_")
         entities_in_tree = [root_entity]
 
         attached = 1
@@ -311,7 +313,7 @@ class Arrangement(Representation, SmurfBase):
                     parent_entity, parent_link_name = entity._anchor.split("::", 1)
                 if parent_entity in [str(e) for e in entities_in_tree]:
                     parent_link = assembly.get_link(parent_entity+"_"+parent_link_name, verbose=True)
-                    assert parent_link is not None, f"parent link {parent_entity}_{parent_link_name} not found "+str(entity)
+                    assert parent_link is not None, f"parent link {parent_entity}::{parent_link_name} not found "+str(entity)
                     if isinstance(root_entity.model, Robot):
                         attach_model = entity.model.duplicate()
                         assembly.unlink_from_world()
@@ -322,6 +324,7 @@ class Arrangement(Representation, SmurfBase):
                     if entity.child is None or str(entity.child) == str(attach_model.get_root()):
                         child_link = attach_model.get_root()
                     else:
+                        print(f"{attach_model.name}::{entity.child} becomes new root")
                         child_link = attach_model.get_link(entity.child)
                         # make sure that we have a consistent downward tree
                         attach_model.exchange_root(child_link)
@@ -329,6 +332,7 @@ class Arrangement(Representation, SmurfBase):
                     attach_model.rename_all(prefix=entity.name + "_", do_not_double=False)
                     origin = entity.origin.duplicate()
                     origin.relative_to = str(entity.origin.relative_to).replace("::", "_", 1)
+                    print(f"{child_link} -> {parent_link}")
                     assembly.attach(
                         other=attach_model,
                         joint=representation.Joint(
