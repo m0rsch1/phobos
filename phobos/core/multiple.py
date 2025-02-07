@@ -187,6 +187,7 @@ class Arrangement(Representation, SmurfBase):
                 entity_defs = file_dict.get("entities", file_dict.get("smurfa", file_dict.get("smurfs", [])))
                 for e_def in entity_defs:
                     self.add_entity(Entity(world=self, **e_def))
+                self.name = file_dict.get('name')
             else:
                 raise IOError(f"The given file has an extension ({ext}) that cannot be parsed as Arrangement.")
         self.excludes += ["inputfile"]
