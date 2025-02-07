@@ -275,6 +275,7 @@ class Arrangement(Representation, SmurfBase):
     def get_root_entities(self):
         return [e for e in self.entities if e._anchor in ["NONE", "WORLD"]]
 
+    # FIXME: This whole function does not work properly
     def assemble(self, root_entity=None):
         if root_entity is None:
             root_entities = self.get_root_entities()
@@ -285,8 +286,10 @@ class Arrangement(Representation, SmurfBase):
             assert root_entity is not None, f"No entity with name {root_entity} found."
 
         if isinstance(root_entity.model, Robot):
+            print(f"{root_entity.name} model {root_entity.model.name} is Robot")
             assembly = root_entity.model.duplicate()
         elif isinstance(root_entity.model, Arrangement):
+            print(f"{root_entity.name} model {root_entity.model.name} is Arrangement")
             assembly = root_entity.model.assemble()
         else:
             raise TypeError(f"Wrong model type of entity {root_entity.name}: {type(root_entity.model)}")
