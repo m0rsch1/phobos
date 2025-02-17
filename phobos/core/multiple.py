@@ -332,7 +332,7 @@ class Arrangement(Representation, SmurfBase):
                     attach_model.rename_all(prefix=entity.name + "_", do_not_double=False)
                     origin = entity.origin.duplicate()
                     origin.relative_to = str(entity.origin.relative_to).replace("::", "_", 1)
-                    print(f"{child_link} -> {parent_link}")
+                    print(f"{child_link} -- {origin.position},{origin.quaternion_dict} -> {parent_link}")
                     assembly.attach(
                         other=attach_model,
                         joint=representation.Joint(
