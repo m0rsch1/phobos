@@ -950,7 +950,6 @@ class Robot(SMURFRobot):
         #print(f"exchange_root: found chain between {str(self.get_root())} and {str(new_root)}: {[str(j) for j in flip_joints]}")
         old_robot = self.duplicate()
         or2x = lambda x: old_robot.get_transformation(x, start=str(old_robot.get_root()))
-        #nr2x = lambda x: old_robot.get_transformation(x, start=str(new_root))
         # Print out start origins
         for jl in self.links + self.joints:
             print(f"*** {str(jl)} ***")

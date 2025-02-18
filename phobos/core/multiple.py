@@ -275,13 +275,6 @@ class Arrangement(Representation, SmurfBase):
     def get_root_entities(self):
         return [e for e in self.entities if e._anchor in ["NONE", "WORLD"]]
 
-    ###
-    # Current debugging state:
-    # The URDF link and joint structure is correct
-    # However, when exchange_root() is called
-    # - the visuals are distorted
-    # - and the transformations are not correct
-    ###
     def assemble(self, root_entity=None):
         if root_entity is None:
             root_entities = self.get_root_entities()
@@ -292,16 +285,13 @@ class Arrangement(Representation, SmurfBase):
             assert root_entity is not None, f"No entity with name {root_entity} found."
 
         if isinstance(root_entity.model, Robot):
-            print(f"{root_entity.name} model {root_entity.model.name} is Robot")
             assembly = root_entity.model.duplicate()
         elif isinstance(root_entity.model, Arrangement):
-            print(f"{root_entity.name} model {root_entity.model.name} is Arrangement")
             assembly = root_entity.model.assemble()
         else:
             raise TypeError(f"Wrong model type of entity {root_entity.name}: {type(root_entity.model)}")
         assembly.name = self.name
         assembly.unlink_from_world()
-        #assembly.rename_all(prefix=root_entity.name + "_" if self.name is None else self.name + "_" + root_entity.name + "_")
         assembly.rename_all(prefix=root_entity.name + "_")
         entities_in_tree = [root_entity]
 
@@ -330,8 +320,6 @@ class Arrangement(Representation, SmurfBase):
                     if entity.child is None or str(entity.child) == str(attach_model.get_root()):
                         child_link = attach_model.get_root()
                     else:
-                        # FIXME: exchange_root is buggy
-                        print(f"{attach_model.name}::{entity.child} becomes new root")
                         child_link = attach_model.get_link(entity.child)
                         # make sure that we have a consistent downward tree
                         attach_model.exchange_root(child_link)
@@ -339,7 +327,7 @@ class Arrangement(Representation, SmurfBase):
                     attach_model.rename_all(prefix=entity.name + "_", do_not_double=False)
                     origin = entity.origin.duplicate()
                     origin.relative_to = str(entity.origin.relative_to).replace("::", "_", 1)
-                    print(f"{child_link} -- {origin.position},{origin.quaternion_dict} -> {parent_link}")
+                    #print(f"{child_link} -- {origin.position},{origin.quaternion_dict} -> {parent_link}")
                     assembly.attach(
                         other=attach_model,
                         joint=representation.Joint(
