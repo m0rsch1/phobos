@@ -950,12 +950,6 @@ class Robot(SMURFRobot):
         #print(f"exchange_root: found chain between {str(self.get_root())} and {str(new_root)}: {[str(j) for j in flip_joints]}")
         old_robot = self.duplicate()
         or2x = lambda x: old_robot.get_transformation(x, start=str(old_robot.get_root()))
-        # Print out start origins
-        for jl in self.links + self.joints:
-            print(f"*** {str(jl)} ***")
-            if jl.origin is None:
-                continue
-            print(f"current origin: {jl.origin.position} {jl.origin.quaternion_dict} {str(jl.origin.relative_to)}")
         # 0. make sure all link parts follow the convention that they have to be relative_to that link
         for link in self.links:
             for vc in link.visuals + link.collisions + link.primitives:
