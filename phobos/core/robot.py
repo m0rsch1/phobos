@@ -971,6 +971,8 @@ class Robot(SMURFRobot):
             joint.parent = joint.child
             joint.child = _temp
             joint.origin = joint.origin.inv(joint.parent)
+            if joint.axis:
+                joint.axis = joint.origin.to_matrix()[0:3, 0:3].dot(joint.axis)
             joint.origin.link_with_robot(self)
         # 2. regenerate tree 
         # NOTE: This function updates the self.parent_map and self.child_map
