@@ -947,52 +947,43 @@ class Robot(SMURFRobot):
         if type(new_root) == str:
             new_root = self.get_link(new_root)
         flip_joints = self.get_chain(self.get_root(), new_root, links=False)
+        #print(f"exchange_root: found chain between {str(self.get_root())} and {str(new_root)}: {[str(j) for j in flip_joints]}")
         old_robot = self.duplicate()
-        or2x = old_robot.get_transformation
-        nr2x = lambda x: old_robot.get_transformation(x, start=str(new_root))
+        or2x = lambda x: old_robot.get_transformation(x, start=str(old_robot.get_root()))
+        #nr2x = lambda x: old_robot.get_transformation(x, start=str(new_root))
+        # Print out start origins
+        for jl in self.links + self.joints:
+            print(f"*** {str(jl)} ***")
+            if jl.origin is None:
+                continue
+            print(f"current origin: {jl.origin.position} {jl.origin.quaternion_dict} {str(jl.origin.relative_to)}")
         # 0. make sure all link parts follow the convention that they have to be relative_to that link
         for link in self.links:
             for vc in link.visuals + link.collisions + link.primitives:
-                if str(vc.origin.relative_to) != str(link):
-                    vc.origin = representation.Pose.from_matrix(
-                        inv(or2x(link)).dot(or2x(vc.origin.relative_to).dot(vc.origin.to_matrix())),
-                        relative_to=link
-                    )
-                    vc.origin.link_with_robot(self)
+                vc.origin = representation.Pose.from_matrix(
+                    inv(or2x(link)).dot(or2x(vc.origin.relative_to).dot(vc.origin.to_matrix())),
+                    relative_to=link
+                )
+                vc.origin.link_with_robot(self)
             if link.inertial is not None:
                 link.inertial.origin = representation.Pose.from_matrix(
                     inv(or2x(link)).dot(or2x(vc.origin.relative_to).dot(link.inertial.origin.to_matrix())),
                     relative_to=link
                 )
                 link.inertial.origin.link_with_robot(self)
-        # 1. get the tree structure correct
+        # 1. invert all flip_joints
         for jointname in flip_joints:
             joint = self.get_joint(jointname)
             _temp = joint.parent
             joint.parent = joint.child
             joint.child = _temp
-        # 2. go through all joints and links and set the origins according to new root
-        for joint in self.joints:
-            joint.origin = representation.Pose.from_matrix(
-                nr2x(joint.name),
-                relative_to=str(new_root)
-            )
+            joint.origin = joint.origin.inv(joint.parent)
             joint.origin.link_with_robot(self)
-        for link in self.links:
-            link.origin = representation.Pose.from_matrix(
-                nr2x(link.name),
-                relative_to=str(new_root)
-            )
-            link.origin.link_with_robot(self)
-        new_root.origin = None
-        # 3. regenerate tree
+        # 2. regenerate tree 
+        # NOTE: This function updates the self.parent_map and self.child_map
         self.regenerate_tree_maps()
-        # 4. make all origins follow the convention
-        for jl in self.links + self.joints:
-            if jl.origin is None:
-                continue
-            jl.origin = jl.joint_relative_origin
-            jl.origin.link_with_robot(self)
+        # 3. We can delete the new_root origin only at the end
+        new_root.origin = None
 
     def fix_tree(self, root, link_entities=True):
         """This method may fix your robot if it has multiple roots. This can fix it under the following conditions:

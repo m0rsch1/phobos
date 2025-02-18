@@ -275,7 +275,13 @@ class Arrangement(Representation, SmurfBase):
     def get_root_entities(self):
         return [e for e in self.entities if e._anchor in ["NONE", "WORLD"]]
 
-    # FIXME: This whole function does not work properly
+    ###
+    # Current debugging state:
+    # The URDF link and joint structure is correct
+    # However, when exchange_root() is called
+    # - the visuals are distorted
+    # - and the transformations are not correct
+    ###
     def assemble(self, root_entity=None):
         if root_entity is None:
             root_entities = self.get_root_entities()
@@ -324,6 +330,7 @@ class Arrangement(Representation, SmurfBase):
                     if entity.child is None or str(entity.child) == str(attach_model.get_root()):
                         child_link = attach_model.get_root()
                     else:
+                        # FIXME: exchange_root is buggy
                         print(f"{attach_model.name}::{entity.child} becomes new root")
                         child_link = attach_model.get_link(entity.child)
                         # make sure that we have a consistent downward tree
